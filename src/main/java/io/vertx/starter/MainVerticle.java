@@ -28,10 +28,11 @@ public class MainVerticle extends AbstractVerticle {
 
 		// Load the default configuration from the classpath
 		ConfigStoreOptions localConfig = new ConfigStoreOptions()
-			.setType("file")
-			.setFormat("json")
-			.setConfig(new JsonObject().put("path", "insult-config.json"));
-
+		      .setType("file")
+		      .setFormat("json")
+		      .setOptional(true)
+        .setConfig(new JsonObject().put("path", "insult-config.json"));
+        
 		// Add the default and container config options into the ConfigRetriever
 		ConfigRetrieverOptions retrieverOptions = new ConfigRetrieverOptions()
 			.addStore(localConfig);
