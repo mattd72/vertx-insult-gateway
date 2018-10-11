@@ -18,7 +18,6 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import static io.vertx.starter.ApplicationProperties.*;
 import io.vertx.reactivex.circuitbreaker.CircuitBreaker;
-import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.reactivex.core.CompositeFuture;
 
 
