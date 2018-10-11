@@ -47,3 +47,5 @@ mvn clean package
 ----
 
 It generates a _fat-jar_ in the `target` directory.
+
+Continue to Lab 5 ->  https://github.com/rhte-reactive-labs/reactive-pipelines/blob/master/labs/lab05-ConfigMap.adoc
