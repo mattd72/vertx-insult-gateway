@@ -15,8 +15,14 @@ import io.vertx.reactivex.ext.web.client.HttpResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import io.vertx.core.json.JsonArray;
-import io.vertx.core.CompositeFuture;
+import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import static io.vertx.starter.ApplicationProperties.*;
+import io.vertx.reactivex.circuitbreaker.CircuitBreaker;
+import io.vertx.circuitbreaker.CircuitBreakerOptions;
+import io.vertx.reactivex.core.CompositeFuture;
+
+
+
 
 public class InsultGatewayVerticle extends AbstractVerticle{
 	private static final Logger LOG = LoggerFactory.getLogger(InsultGatewayVerticle.class);
@@ -26,12 +32,40 @@ public class InsultGatewayVerticle extends AbstractVerticle{
     private WebClient clientVertx;
     private ConfigRetriever conf;
 
+    CircuitBreaker clientSpringbootBreaker;
+    CircuitBreaker clientSwarmBreaker;
+    CircuitBreaker clientVertxBreaker;
+
+
+
 	@Override
 	  public void start(Future<Void> startFuture) {
 
 		conf = ConfigRetriever.create(vertx);
 		Router router = Router.router(vertx);
 
+
+
+		CircuitBreakerOptions breakerOpts = new CircuitBreakerOptions()
+			      .setFallbackOnFailure(true)
+			      .setMaxFailures(2)
+			      .setMaxRetries(2)
+			      .setResetTimeout(config().getInteger(GATEWAY_CIRCUIT_TIMEOUT, 1000))
+			      .setTimeout(config().getInteger(GATEWAY_RESET_TIMEOUT, 1000));
+
+		clientSpringbootBreaker = CircuitBreaker
+			      .create("nounSpringBoot", vertx, breakerOpts)
+			      .openHandler(t -> circuitBreakerHandler("adj", "[open]"));
+
+
+			    clientSwarmBreaker = CircuitBreaker
+			      .create("swarmAdj", vertx, breakerOpts)
+			      .openHandler(t -> circuitBreakerHandler("swarmAdj", "[open]"));
+
+
+			    clientVertxBreaker = CircuitBreaker
+			      .create("vertxAdj", vertx, breakerOpts)
+			      .openHandler(t -> circuitBreakerHandler("vertxAdj", "[open]"));
 
 
 	    clientSpringboot = WebClient.create(vertx, new WebClientOptions()
@@ -50,6 +84,12 @@ public class InsultGatewayVerticle extends AbstractVerticle{
 
 
 
+	    	    System.out.println("GATEWAY_HOST_WILDFLYSWARM_ADJ="+config().getString(GATEWAY_HOST_VERTX_ADJ,"springboot-noun-service.vertx-adjective.svc"));
+	    	    System.out.println("GATEWAY_HOST_SPRINGBOOT_NOUN="+config().getString(GATEWAY_HOST_SPRINGBOOT_NOUN,"wildflyswarm-adj.vertx-adjective.svc"));
+	    	    System.out.println("GATEWAY_HOST_VERTX_ADJ="+config().getString(GATEWAY_HOST_VERTX_ADJ,"wildflyswarm-adj.vertx-adjective.svc"));
+
+
+
 	    	    vertx.createHttpServer().requestHandler(router::accept).listen(8080);
 	    	    router.get("/api/insult").handler(this::insultHandler);
 	    	    router.get("/*").handler(StaticHandler.create());
@@ -59,41 +99,57 @@ public class InsultGatewayVerticle extends AbstractVerticle{
 
 
 	}
-	Future<JsonObject> getNoun() {
-        Future<JsonObject> fut = Future.future();
-        clientSpringboot.get("/api/noun")
-                .timeout(3000)
-                .rxSend()
-
-                .map(HttpResponse::bodyAsJsonObject)
-                .doOnError(fut::fail)
-                .subscribe(fut::complete);
-        return fut;
-    }
+	io.vertx.reactivex.core.Future<JsonObject> getNoun() {
 
 
-	Future<JsonObject> getAdjective() {
-        Future<JsonObject> fut = Future.future();
-        clientSwarm.get("/api/adjective")
-                .timeout(3000)
-                .rxSend()
+		return clientSpringbootBreaker.executeWithFallback(fut ->
+		  clientSpringboot.get("/api/noun")
+			.timeout(3000)
+			.rxSend()
+			.doOnError(e -> LOG.error("REST Request failed", e))
+			.map(HttpResponse::bodyAsJsonObject)
+			.subscribe(
+			  j -> fut.complete(j),
+			  e -> fut.fail(e)
+			), t -> circuitBreakerHandler("noun", "[SpringBoot noun failure]"));
+	
+	
+		//eturn fut;
+	  }
 
-                .map(HttpResponse::bodyAsJsonObject)
-                .doOnError(fut::fail)
-                .subscribe(fut::complete);
-        return fut;
-    }
-	Future<JsonObject> getAdjective2() {
-        Future<JsonObject> fut = Future.future();
-        clientVertx.get("/api/adjective")
-                .timeout(3000)
-                .rxSend()
+	public JsonObject circuitBreakerHandler(String key, String value) {
+	    System.out.println("Error= " + key + "," + "value=" + value);
 
-                .map(HttpResponse::bodyAsJsonObject)
-                .doOnError(fut::fail)
-                .subscribe(fut::complete);
-        return fut;
-    }
+	    return new JsonObject().put(key, value);
+	  }
+	 
+	  io.vertx.reactivex.core.Future<JsonObject> getAdjective() {
+
+
+		return clientSwarmBreaker.executeWithFallback(fut ->
+		  clientSwarm.get("/api/adjective")
+			.timeout(3000)
+			.rxSend()
+			.doOnError(e -> LOG.error("REST Request failed", e))
+			.map(HttpResponse::bodyAsJsonObject)
+			.subscribe(
+			  j -> fut.complete(j),
+			  e -> fut.fail(e)
+			), t -> circuitBreakerHandler("adjective", "[Swarm adjective failure]"));
+	  }
+	  io.vertx.reactivex.core.Future<JsonObject> getAdjective2() {
+		return clientVertxBreaker.executeWithFallback(fut ->
+		  clientVertx.get("/api/adjective")
+			.timeout(3000)
+			.rxSend()
+			.doOnError(e -> LOG.error("REST Request failed", e))
+			.map(HttpResponse::bodyAsJsonObject)
+			.subscribe(
+			  j -> fut.complete(j),
+			  e -> fut.fail(e)
+			), t -> circuitBreakerHandler("adjective", "[Vertx adj failure]"));
+	  }
+
 	private AsyncResult<JsonObject> buildInsult(CompositeFuture cf) {
         JsonObject insult = new JsonObject();
         JsonArray adjectives = new JsonArray();
