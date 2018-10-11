@@ -35,18 +35,20 @@ public class InsultGatewayVerticle extends AbstractVerticle{
 
 
 	    clientSpringboot = WebClient.create(vertx, new WebClientOptions()
-	    	      .setDefaultHost(config().getString(GATEWAY_HOST_SPRINGBOOT_NOUN, "springboot-noun-service.vertx-adjective.svc"))
-	    	      .setDefaultPort(config().getInteger(GATEWAY_HOST_SPRINGBOOT_NOUN_PORT, 8080)));
+	    	      .setDefaultHost(config().getString(GATEWAY_HOST_SPRINGBOOT_NOUN, "springboot-noun-service-devenv-user2.apps.9249.rhte.opentlc.com"))
+	    	      .setDefaultPort(config().getInteger(GATEWAY_HOST_SPRINGBOOT_NOUN_PORT, 80)));
 
 	    	    clientSwarm = WebClient.create(vertx, new WebClientOptions()
-	    	      .setDefaultHost(config().getString(GATEWAY_HOST_WILDFLYSWARM_ADJ, "wildflyswarm-adj.vertx-adjective.svc"))
-	    	      .setDefaultPort(config().getInteger(GATEWAY_HOST_WILDFLYSWARM_ADJ_PORT, 8080)));
+	    	      .setDefaultHost(config().getString(GATEWAY_HOST_WILDFLYSWARM_ADJ, "wildflyswarm-adj-devenv-user2.apps.9249.rhte.opentlc.com"))
+	    	      .setDefaultPort(config().getInteger(GATEWAY_HOST_WILDFLYSWARM_ADJ_PORT, 80)));
 
 
 
 	    	    clientVertx = WebClient.create(vertx, new WebClientOptions()
-	    	            .setDefaultHost("spring-boot-rest-http-springboot-adj.b9ad.pro-us-east-1.openshiftapps.com")
-	    	            .setDefaultPort(80));
+	    	            .setDefaultHost(config().getString(GATEWAY_HOST_VERTX_ADJ,"vertx-adjective-service-devenv-user2.apps.9249.rhte.opentlc.com"))
+	    	            .setDefaultPort(config().getInteger(GATEWAY_HOST_VERTX_ADJ_PORT,80)));
+
+
 
 	    	    vertx.createHttpServer().requestHandler(router::accept).listen(8080);
 	    	    router.get("/api/insult").handler(this::insultHandler);
